@@ -1,0 +1,30 @@
+{
+  "name": "AD8232 simulado",
+  "author": "Dayane Nascimento de Toledo",
+  "pins": [
+    "GND",
+    "3.3V",
+    "OUTPUT",
+    "LO+",
+    "LO-",
+    "SDN"
+  ],
+  "controls": [
+    {
+      "id": "bpm",
+      "label": "Frequência cardíaca (BPM)",
+      "type": "range",
+      "min": 30,
+      "max": 200,
+      "step": 1
+    },
+    {
+      "id": "eletrodo",
+      "label": "Eletrodo solto (0 = conectados, 1 = LO+, 2 = LO-)",
+      "type": "range",
+      "min": 0,
+      "max": 2,
+      "step": 1
+    }
+  ]
+}

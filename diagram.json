@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "author": "Dayane Nascimento de Toledo",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    {
+      "type": "chip-ad8232",
+      "id": "ecg1",
+      "top": 30,
+      "left": -230,
+      "attrs": { "bpm": "75", "eletrodo": "0" }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz1",
+      "top": 160,
+      "left": -190,
+      "attrs": { "volume": "0.1" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "ecg1:3.3V", "esp:3V3", "red", [] ],
+    [ "ecg1:GND", "esp:GND.1", "black", [] ],
+    [ "ecg1:OUTPUT", "esp:34", "gold", [] ],
+    [ "ecg1:LO+", "esp:32", "green", [] ],
+    [ "ecg1:LO-", "esp:33", "blue", [] ],
+    [ "bz1:2", "esp:25", "purple", [] ],
+    [ "bz1:1", "esp:GND.1", "black", [] ]
+  ],
+  "dependencies": {}
+}

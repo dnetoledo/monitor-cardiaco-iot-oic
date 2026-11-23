@@ -1,0 +1,1297 @@
+[
+  {
+    "id": "tab_oic",
+    "type": "tab",
+    "label": "Monitor Cardíaco – OIC",
+    "disabled": false,
+    "info": "Fluxo do projeto 'Sistema Inteligente de Monitoramento Cardíaco em Tempo Real com Alerta Sonoro utilizando IoT' (Dayane Toledo – OIC/Mackenzie).\n\nRecebe do ESP32 (Wokwi) os tópicos ecg/dayane/* pelo broker test.mosquitto.org e mostra os dados no painel @flowfuse/node-red-dashboard. Também envia a faixa segura para o ESP32 em ecg/dayane/config/faixa."
+  },
+  {
+    "id": "broker_mosq",
+    "type": "mqtt-broker",
+    "name": "Broker Mosquitto público",
+    "broker": "test.mosquitto.org",
+    "port": "1883",
+    "clientid": "nodered-dayane-oic-7f3a",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthRetain": "false",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closeQos": "0",
+    "closeRetain": "false",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willRetain": "false",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  },
+  {
+    "id": "ui_base",
+    "type": "ui-base",
+    "name": "Monitor Cardíaco IoT",
+    "path": "/dashboard",
+    "appIcon": "",
+    "includeClientData": true,
+    "acceptsClientConfig": [
+      "ui-notification",
+      "ui-control"
+    ],
+    "showPathInSidebar": false,
+    "headerContent": "page",
+    "navigationStyle": "default",
+    "titleBarStyle": "default",
+    "showReconnectNotification": true
+  },
+  {
+    "id": "ui_theme",
+    "type": "ui-theme",
+    "name": "Tema claro",
+    "colors": {
+      "surface": "#fcfcfd",
+      "primary": "#c62828",
+      "bgPage": "#f9f9fb",
+      "groupBg": "#ffffff",
+      "groupOutline": "#d9d9e0"
+    },
+    "sizes": {
+      "density": "default",
+      "pagePadding": "12px",
+      "groupGap": "12px",
+      "groupBorderRadius": "4px",
+      "widgetGap": "12px"
+    }
+  },
+  {
+    "id": "ui_page",
+    "type": "ui-page",
+    "name": "Monitor Cardíaco",
+    "ui": "ui_base",
+    "path": "/monitor",
+    "icon": "heart-pulse",
+    "layout": "grid",
+    "theme": "ui_theme",
+    "breakpoints": [
+      {
+        "name": "Default",
+        "px": "0",
+        "cols": "3"
+      },
+      {
+        "name": "Tablet",
+        "px": "576",
+        "cols": "6"
+      },
+      {
+        "name": "Small Desktop",
+        "px": "768",
+        "cols": "9"
+      },
+      {
+        "name": "Desktop",
+        "px": "1024",
+        "cols": "12"
+      }
+    ],
+    "order": 1,
+    "className": "",
+    "visible": "true",
+    "disabled": "false"
+  },
+  {
+    "id": "grp_bpm",
+    "type": "ui-group",
+    "name": "Frequência cardíaca",
+    "page": "ui_page",
+    "width": "6",
+    "height": "1",
+    "order": 1,
+    "showTitle": true,
+    "className": "",
+    "visible": "true",
+    "disabled": "false",
+    "groupType": "default"
+  },
+  {
+    "id": "grp_estado",
+    "type": "ui-group",
+    "name": "Estado do dispositivo",
+    "page": "ui_page",
+    "width": "3",
+    "height": "1",
+    "order": 2,
+    "showTitle": true,
+    "className": "",
+    "visible": "true",
+    "disabled": "false",
+    "groupType": "default"
+  },
+  {
+    "id": "grp_faixa",
+    "type": "ui-group",
+    "name": "Faixa segura (enviada ao ESP32)",
+    "page": "ui_page",
+    "width": "3",
+    "height": "1",
+    "order": 3,
+    "showTitle": true,
+    "className": "",
+    "visible": "true",
+    "disabled": "false",
+    "groupType": "default"
+  },
+  {
+    "id": "grp_medicao",
+    "type": "ui-group",
+    "name": "Medição de tempo do atuador",
+    "page": "ui_page",
+    "width": "6",
+    "height": "1",
+    "order": 4,
+    "showTitle": true,
+    "className": "",
+    "visible": "true",
+    "disabled": "false",
+    "groupType": "default"
+  },
+  {
+    "id": "c_geral",
+    "type": "comment",
+    "name": "LEIA-ME: visão geral do fluxo",
+    "info": "Bloco 1 – BPM: ecg/dayane/bpm → 'Verifica BPM' → medidor, gráfico e situação.\nBloco 2 – Alerta, eletrodos e status: mostram o que o ESP32 publica.\nBloco 3 – Faixa segura: o formulário do painel publica {\"min\":..,\"max\":..} em ecg/dayane/config/faixa.\nBloco 4 – TESTES: botões inject que publicam mensagens de exemplo no broker, para testar o painel sem o ESP32 ligado.\n\nQuem decide o alarme sonoro é o ESP32 (5 s fora da faixa). O Node-RED só exibe e configura.",
+    "x": 180,
+    "y": 40,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "c_bpm",
+    "type": "comment",
+    "name": "1) BPM – ecg/dayane/bpm (QoS 0, a cada 2 s)",
+    "info": "Recebe {\"bpm\":72}. A função compara com a faixa segura guardada na variável de fluxo 'faixa'.",
+    "x": 200,
+    "y": 100,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "in_bpm",
+    "type": "mqtt in",
+    "name": "BPM (ecg/dayane/bpm)",
+    "topic": "ecg/dayane/bpm",
+    "qos": "0",
+    "datatype": "json",
+    "broker": "broker_mosq",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 170,
+    "y": 160,
+    "wires": [
+      [
+        "fn_verifica",
+        "dbg_bpm"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "fn_verifica",
+    "type": "function",
+    "name": "Verifica BPM",
+    "func": "// Verifica BPM\n// Entrada: msg.payload = {\"bpm\": 72}  (tópico ecg/dayane/bpm)\n// Saída 1: número do BPM -> medidor e gráfico\n// Saída 2: texto da situação -> painel\n\nconst bpm = Number(msg.payload && msg.payload.bpm);\nif (!Number.isFinite(bpm)) {\n    node.warn(\"Mensagem de BPM inválida: \" + JSON.stringify(msg.payload));\n    return null;\n}\n\n// Faixa segura atual (padrão 60–100 BPM, alterada pelo formulário do painel)\nconst faixa = flow.get(\"faixa\") || { min: 60, max: 100 };\n\nlet situacao;\nlet dentro = false;\nif (bpm < faixa.min) {\n    situacao = `Abaixo da faixa (${faixa.min}–${faixa.max} BPM)`;\n} else if (bpm > faixa.max) {\n    situacao = `Acima da faixa (${faixa.min}–${faixa.max} BPM)`;\n} else {\n    situacao = \"Dentro da faixa\";\n    dentro = true;\n}\n\n// Mostra o resultado embaixo do nó, no editor\nnode.status({ fill: dentro ? \"green\" : \"red\", shape: \"dot\", text: `${bpm} BPM – ${situacao}` });\n\nreturn [\n    { payload: bpm, topic: \"BPM\" },\n    { payload: situacao }\n];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "Compara o BPM recebido com a faixa segura (flow.faixa).",
+    "x": 420,
+    "y": 160,
+    "wires": [
+      [
+        "ui_gauge",
+        "ui_chart"
+      ],
+      [
+        "ui_situacao"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "dbg_bpm",
+    "type": "debug",
+    "name": "debug BPM recebido",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 440,
+    "y": 220,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "ui_gauge",
+    "type": "ui-gauge",
+    "name": "Medidor BPM",
+    "group": "grp_bpm",
+    "order": 1,
+    "width": 3,
+    "height": 3,
+    "gtype": "gauge-half",
+    "gstyle": "needle",
+    "title": "BPM atual",
+    "alwaysShowTitle": false,
+    "floatingTitlePosition": "top-left",
+    "units": "BPM",
+    "icon": "heart-pulse",
+    "prefix": "",
+    "suffix": "",
+    "segments": [
+      {
+        "from": "0",
+        "color": "#1e88e5"
+      },
+      {
+        "from": "60",
+        "color": "#43a047"
+      },
+      {
+        "from": "100",
+        "color": "#e53935"
+      }
+    ],
+    "min": 30,
+    "max": 200,
+    "sizeThickness": 16,
+    "sizeGap": 4,
+    "sizeKeyThickness": 8,
+    "styleRounded": true,
+    "styleGlow": false,
+    "className": "",
+    "value": "payload",
+    "valueType": "msg",
+    "x": 690,
+    "y": 120,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "ui_chart",
+    "type": "ui-chart",
+    "group": "grp_bpm",
+    "name": "Gráfico BPM",
+    "label": "Histórico do BPM (últimos 10 min)",
+    "order": 2,
+    "chartType": "line",
+    "category": "topic",
+    "categoryType": "msg",
+    "xAxisLabel": "",
+    "xAxisProperty": "",
+    "xAxisPropertyType": "timestamp",
+    "xAxisType": "time",
+    "xAxisFormat": "",
+    "xAxisFormatType": "auto",
+    "yAxisLabel": "BPM",
+    "yAxisProperty": "payload",
+    "yAxisPropertyType": "msg",
+    "ymin": "30",
+    "ymax": "200",
+    "action": "append",
+    "stackSeries": false,
+    "pointShape": "circle",
+    "pointRadius": 3,
+    "showLegend": false,
+    "removeOlder": "10",
+    "removeOlderUnit": "60",
+    "removeOlderPoints": "",
+    "colors": [
+      "#c62828"
+    ],
+    "textColor": [
+      "#666666"
+    ],
+    "textColorDefault": true,
+    "gridColor": [
+      "#e5e5e5"
+    ],
+    "gridColorDefault": true,
+    "width": 6,
+    "height": 5,
+    "className": "",
+    "interpolation": "linear",
+    "x": 690,
+    "y": 160,
+    "wires": [
+      []
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "ui_situacao",
+    "type": "ui-text",
+    "group": "grp_bpm",
+    "order": 3,
+    "width": 0,
+    "height": 0,
+    "name": "Situação",
+    "label": "Situação",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#717171",
+    "wrapText": true,
+    "className": "",
+    "value": "payload",
+    "valueType": "msg",
+    "x": 680,
+    "y": 200,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "c_estado",
+    "type": "comment",
+    "name": "2) Alerta, eletrodos e status do ESP32 (QoS 1)",
+    "info": "ecg/dayane/alerta: ON/OFF quando muda.\necg/dayane/eletrodos: OK/SOLTO.\necg/dayane/status: online (retida) ou offline (LWT, quando o ESP32 cai).",
+    "x": 210,
+    "y": 280,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "in_alerta",
+    "type": "mqtt in",
+    "name": "Alerta (ecg/dayane/alerta)",
+    "topic": "ecg/dayane/alerta",
+    "qos": "1",
+    "datatype": "utf8",
+    "broker": "broker_mosq",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 180,
+    "y": 340,
+    "wires": [
+      [
+        "fn_alerta",
+        "dbg_estado",
+        "fn_med_calcula"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "fn_alerta",
+    "type": "function",
+    "name": "Formata alerta",
+    "func": "// Formata alerta: \"ON\" / \"OFF\" -> texto do painel\nconst v = String(msg.payload).trim().toUpperCase();\nif (v === \"ON\") {\n    node.status({ fill: \"red\", shape: \"dot\", text: \"ALERTA ATIVO\" });\n    return [\n        { payload: \"ATIVO (fora da faixa > 5 s)\" },\n        { payload: \"Alerta: frequência cardíaca fora da faixa segura!\" }  // aviso pop-up\n    ];\n}\nif (v === \"OFF\") {\n    node.status({ fill: \"green\", shape: \"ring\", text: \"sem alerta\" });\n    return [{ payload: \"Desligado\" }, null];\n}\nnode.warn(\"Valor de alerta desconhecido: \" + msg.payload);\nreturn null;",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 430,
+    "y": 340,
+    "wires": [
+      [
+        "ui_alerta"
+      ],
+      [
+        "ui_notif"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "ui_alerta",
+    "type": "ui-text",
+    "group": "grp_estado",
+    "order": 1,
+    "width": 0,
+    "height": 0,
+    "name": "Alerta sonoro",
+    "label": "Alerta sonoro",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#717171",
+    "wrapText": true,
+    "className": "",
+    "value": "payload",
+    "valueType": "msg",
+    "x": 680,
+    "y": 320,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "ui_notif",
+    "type": "ui-notification",
+    "ui": "ui_base",
+    "position": "top right",
+    "colorDefault": false,
+    "color": "#c62828",
+    "displayTime": "5",
+    "showCountdown": true,
+    "outputs": 1,
+    "allowDismiss": true,
+    "dismissText": "Fechar",
+    "allowConfirm": false,
+    "confirmText": "OK",
+    "raw": false,
+    "className": "",
+    "name": "Aviso de alerta",
+    "x": 690,
+    "y": 360,
+    "wires": [
+      []
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "in_eletrodos",
+    "type": "mqtt in",
+    "name": "Eletrodos (ecg/dayane/eletrodos)",
+    "topic": "ecg/dayane/eletrodos",
+    "qos": "1",
+    "datatype": "utf8",
+    "broker": "broker_mosq",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 200,
+    "y": 400,
+    "wires": [
+      [
+        "fn_eletrodos",
+        "dbg_estado"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "fn_eletrodos",
+    "type": "function",
+    "name": "Formata eletrodos",
+    "func": "// Formata eletrodos: \"OK\" / \"SOLTO\"\nconst v = String(msg.payload).trim().toUpperCase();\nif (v === \"OK\") {\n    node.status({ fill: \"green\", shape: \"dot\", text: \"conectados\" });\n    return { payload: \"Conectados\" };\n}\nif (v === \"SOLTO\") {\n    node.status({ fill: \"yellow\", shape: \"dot\", text: \"eletrodo solto\" });\n    return { payload: \"Solto – BPM suspenso\" };\n}\nnode.warn(\"Valor de eletrodos desconhecido: \" + msg.payload);\nreturn null;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 440,
+    "y": 400,
+    "wires": [
+      [
+        "ui_eletrodos"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "ui_eletrodos",
+    "type": "ui-text",
+    "group": "grp_estado",
+    "order": 2,
+    "width": 0,
+    "height": 0,
+    "name": "Eletrodos",
+    "label": "Eletrodos",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#717171",
+    "wrapText": true,
+    "className": "",
+    "value": "payload",
+    "valueType": "msg",
+    "x": 670,
+    "y": 400,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "in_status",
+    "type": "mqtt in",
+    "name": "Status (ecg/dayane/status)",
+    "topic": "ecg/dayane/status",
+    "qos": "1",
+    "datatype": "utf8",
+    "broker": "broker_mosq",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 180,
+    "y": 460,
+    "wires": [
+      [
+        "fn_status",
+        "dbg_estado"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "fn_status",
+    "type": "function",
+    "name": "Formata status",
+    "func": "// Formata status: \"online\" / \"offline\" (LWT)\nconst v = String(msg.payload).trim().toLowerCase();\nconst online = (v === \"online\");\nnode.status({ fill: online ? \"green\" : \"grey\", shape: \"dot\", text: v });\nreturn { payload: online ? \"Online\" : \"Offline (ESP32 desconectado)\" };",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 430,
+    "y": 460,
+    "wires": [
+      [
+        "ui_status"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "ui_status",
+    "type": "ui-text",
+    "group": "grp_estado",
+    "order": 3,
+    "width": 0,
+    "height": 0,
+    "name": "ESP32",
+    "label": "ESP32",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#717171",
+    "wrapText": true,
+    "className": "",
+    "value": "payload",
+    "valueType": "msg",
+    "x": 670,
+    "y": 460,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "dbg_estado",
+    "type": "debug",
+    "name": "debug alerta/eletrodos/status",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 470,
+    "y": 520,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "c_faixa",
+    "type": "comment",
+    "name": "3) Faixa segura → ecg/dayane/config/faixa (QoS 1)",
+    "info": "O formulário envia min e max. A função valida, guarda em flow.faixa (usada pelo 'Verifica BPM') e publica {\"min\":60,\"max\":100} para o ESP32, que assina esse tópico.",
+    "x": 210,
+    "y": 580,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "inj_faixa_padrao",
+    "type": "inject",
+    "name": "Faixa padrão ao iniciar (60–100)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "1",
+    "topic": "",
+    "payload": "{\"min\":60,\"max\":100}",
+    "payloadType": "json",
+    "x": 180,
+    "y": 640,
+    "wires": [
+      [
+        "fn_faixa_local"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "fn_faixa_local",
+    "type": "function",
+    "name": "Guarda faixa padrão",
+    "func": "// Só guarda a faixa padrão no Node-RED (não publica no broker)\nflow.set(\"faixa\", msg.payload);\nreturn { payload: `${msg.payload.min} a ${msg.payload.max} BPM` };",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 450,
+    "y": 640,
+    "wires": [
+      [
+        "ui_faixa_atual"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "ui_form_faixa",
+    "type": "ui-form",
+    "name": "Formulário da faixa",
+    "group": "grp_faixa",
+    "label": "",
+    "order": 1,
+    "width": 0,
+    "height": 0,
+    "options": [
+      {
+        "label": "Mínimo (BPM)",
+        "key": "min",
+        "type": "number",
+        "required": true,
+        "rows": null
+      },
+      {
+        "label": "Máximo (BPM)",
+        "key": "max",
+        "type": "number",
+        "required": true,
+        "rows": null
+      }
+    ],
+    "formValue": {
+      "min": "",
+      "max": ""
+    },
+    "payload": "",
+    "submit": "Enviar ao ESP32",
+    "cancel": "Limpar",
+    "resetOnSubmit": false,
+    "topic": "topic",
+    "topicType": "msg",
+    "splitLayout": "",
+    "className": "",
+    "passthru": false,
+    "dropdownOptions": [],
+    "x": 180,
+    "y": 700,
+    "wires": [
+      [
+        "fn_monta_faixa"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "fn_monta_faixa",
+    "type": "function",
+    "name": "Monta faixa",
+    "func": "// Monta faixa: valida o formulário e prepara a mensagem MQTT\n// Entrada: msg.payload = { min: \"55\", max: \"110\" }\nconst min = Number(msg.payload.min);\nconst max = Number(msg.payload.max);\n\nif (!Number.isFinite(min) || !Number.isFinite(max) || min < 30 || max > 220 || min >= max) {\n    const erro = \"Faixa inválida: use números entre 30 e 220, com mínimo menor que o máximo.\";\n    node.status({ fill: \"red\", shape: \"ring\", text: \"faixa inválida\" });\n    return [null, null, { payload: erro }];\n}\n\nconst faixa = { min: min, max: max };\nflow.set(\"faixa\", faixa);               // usada pelo nó \"Verifica BPM\"\nnode.status({ fill: \"green\", shape: \"dot\", text: `enviada: ${min}–${max}` });\n\nreturn [\n    { topic: \"ecg/dayane/config/faixa\", payload: faixa },   // -> MQTT out (vira {\"min\":..,\"max\":..})\n    { payload: `${min} a ${max} BPM` },                    // -> texto \"Faixa atual\"\n    { payload: `Nova faixa enviada ao ESP32: ${min}–${max} BPM` }  // -> aviso\n];",
+    "outputs": 3,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 430,
+    "y": 700,
+    "wires": [
+      [
+        "out_faixa",
+        "dbg_faixa"
+      ],
+      [
+        "ui_faixa_atual"
+      ],
+      [
+        "ui_notif"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "out_faixa",
+    "type": "mqtt out",
+    "name": "Publica faixa (ecg/dayane/config/faixa)",
+    "topic": "ecg/dayane/config/faixa",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "broker_mosq",
+    "x": 740,
+    "y": 680,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "dbg_faixa",
+    "type": "debug",
+    "name": "debug faixa enviada",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 680,
+    "y": 740,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "ui_faixa_atual",
+    "type": "ui-text",
+    "group": "grp_faixa",
+    "order": 2,
+    "width": 0,
+    "height": 0,
+    "name": "Faixa atual",
+    "label": "Faixa atual",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#717171",
+    "wrapText": true,
+    "className": "",
+    "value": "payload",
+    "valueType": "msg",
+    "x": 690,
+    "y": 640,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "c_testes",
+    "type": "comment",
+    "name": "4) TESTES – simula o ESP32 (clique no quadradinho à esquerda)",
+    "info": "Cada inject publica uma mensagem de exemplo no broker, nos mesmos tópicos do ESP32. Serve para testar o painel antes do Wokwi estar pronto. Não use durante a validação oficial.",
+    "x": 240,
+    "y": 800,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "t_bpm72",
+    "type": "inject",
+    "name": "TESTE: BPM 72 (normal)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "ecg/dayane/bpm",
+    "payload": "{\"bpm\":72}",
+    "payloadType": "json",
+    "x": 190,
+    "y": 860,
+    "wires": [
+      [
+        "out_teste"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "t_bpm45",
+    "type": "inject",
+    "name": "TESTE: BPM 45 (baixo)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "ecg/dayane/bpm",
+    "payload": "{\"bpm\":45}",
+    "payloadType": "json",
+    "x": 190,
+    "y": 900,
+    "wires": [
+      [
+        "out_teste"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "t_bpm130",
+    "type": "inject",
+    "name": "TESTE: BPM 130 (alto)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "ecg/dayane/bpm",
+    "payload": "{\"bpm\":130}",
+    "payloadType": "json",
+    "x": 190,
+    "y": 940,
+    "wires": [
+      [
+        "out_teste"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "t_al_on",
+    "type": "inject",
+    "name": "TESTE: alerta ON",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "ecg/dayane/alerta",
+    "payload": "ON",
+    "payloadType": "str",
+    "x": 190,
+    "y": 980,
+    "wires": [
+      [
+        "out_teste"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "t_al_off",
+    "type": "inject",
+    "name": "TESTE: alerta OFF",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "ecg/dayane/alerta",
+    "payload": "OFF",
+    "payloadType": "str",
+    "x": 190,
+    "y": 1020,
+    "wires": [
+      [
+        "out_teste"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "t_el_solto",
+    "type": "inject",
+    "name": "TESTE: eletrodo SOLTO",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "ecg/dayane/eletrodos",
+    "payload": "SOLTO",
+    "payloadType": "str",
+    "x": 190,
+    "y": 1060,
+    "wires": [
+      [
+        "out_teste"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "t_el_ok",
+    "type": "inject",
+    "name": "TESTE: eletrodos OK",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "ecg/dayane/eletrodos",
+    "payload": "OK",
+    "payloadType": "str",
+    "x": 190,
+    "y": 1100,
+    "wires": [
+      [
+        "out_teste"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "t_st_on",
+    "type": "inject",
+    "name": "TESTE: status online",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "ecg/dayane/status",
+    "payload": "online",
+    "payloadType": "str",
+    "x": 190,
+    "y": 1140,
+    "wires": [
+      [
+        "out_teste"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "out_teste",
+    "type": "mqtt out",
+    "name": "Publica teste (tópico do inject)",
+    "topic": "",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "broker_mosq",
+    "x": 520,
+    "y": 1000,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "c_med",
+    "type": "comment",
+    "name": "5) MEDIÇÃO: tempo comando → buzzer (item 7 da entrega)",
+    "info": "Antes: chip AD8232 em 75 BPM e alerta desligado.\n1. Clique 'MEDIR ATUADOR': envia a faixa 40–50 (o BPM 75 fica fora).\n2. O ESP32 conta 5 s fora da faixa, liga o buzzer e publica alerta ON.\n3. A função mede o tempo entre o envio do comando e a chegada do ON.\n4. Clique 'Restaurar faixa 60–100', espere o alerta OFF e repita (4 vezes).\nO tempo inclui os 5 s de persistência do método; a latência de rede é o total menos 5 s e menos o tempo interno mostrado no Monitor Serial do ESP32 ([MEDICAO ATUADOR]).",
+    "x": 250,
+    "y": 1220,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "inj_medir",
+    "type": "inject",
+    "name": "MEDIR ATUADOR: envia faixa 40–50",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 200,
+    "y": 1280,
+    "wires": [
+      [
+        "fn_med_inicia"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "fn_med_inicia",
+    "type": "function",
+    "name": "Inicia medição",
+    "func": "// Inicia medição: guarda o instante do comando e envia a faixa 40–50\nconst faixa = { min: 40, max: 50 };\nflow.set(\"t_comando\", Date.now());\nflow.set(\"faixa\", faixa);\nnode.status({ fill: \"blue\", shape: \"ring\", text: \"aguardando alerta ON...\" });\nreturn [\n    { topic: \"ecg/dayane/config/faixa\", payload: faixa },\n    { payload: \"40 a 50 BPM (medição)\" }\n];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 470,
+    "y": 1280,
+    "wires": [
+      [
+        "out_faixa"
+      ],
+      [
+        "ui_faixa_atual"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "fn_med_calcula",
+    "type": "function",
+    "name": "Calcula tempo do atuador",
+    "func": "// Calcula tempo: comando enviado -> alerta ON recebido do ESP32\nif (String(msg.payload).trim().toUpperCase() !== \"ON\") return null;\nconst t0 = flow.get(\"t_comando\");\nif (!t0) return null;                  // ON que não veio de uma medição\nflow.set(\"t_comando\", null);\n\nconst dt = Date.now() - t0;\nconst lista = flow.get(\"med_atuador\") || [];\nlista.push(dt);\nif (lista.length > 4) lista.shift();   // guarda as 4 últimas\nflow.set(\"med_atuador\", lista);\n\nconst media = lista.reduce((a, b) => a + b, 0) / lista.length;\nnode.status({ fill: \"green\", shape: \"dot\", text: `${dt} ms (média ${media.toFixed(0)} ms)` });\nreturn {\n    payload: lista.map((v, i) => `#${i + 1}: ${v} ms`).join(\"  |  \") + `  |  média: ${media.toFixed(0)} ms`,\n    medicoes: lista,\n    media: media\n};",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 470,
+    "y": 1340,
+    "wires": [
+      [
+        "ui_med",
+        "dbg_med"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "ui_med",
+    "type": "ui-text",
+    "group": "grp_medicao",
+    "order": 1,
+    "width": 0,
+    "height": 0,
+    "name": "Comando → alerta ON",
+    "label": "Comando → alerta ON",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#717171",
+    "wrapText": true,
+    "className": "",
+    "value": "payload",
+    "valueType": "msg",
+    "x": 760,
+    "y": 1340,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "dbg_med",
+    "type": "debug",
+    "name": "debug medições",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 740,
+    "y": 1390,
+    "wires": [],
+    "z": "tab_oic"
+  },
+  {
+    "id": "inj_restaura",
+    "type": "inject",
+    "name": "Restaurar faixa 60–100",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "{\"min\":60,\"max\":100}",
+    "payloadType": "json",
+    "x": 180,
+    "y": 1420,
+    "wires": [
+      [
+        "fn_restaura"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "fn_restaura",
+    "type": "function",
+    "name": "Restaura faixa",
+    "func": "// Volta a faixa padrão (o alerta deve desligar)\nflow.set(\"faixa\", msg.payload);\nflow.set(\"t_comando\", null);\nreturn [\n    { topic: \"ecg/dayane/config/faixa\", payload: msg.payload },\n    { payload: `${msg.payload.min} a ${msg.payload.max} BPM` }\n];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 450,
+    "y": 1420,
+    "wires": [
+      [
+        "out_faixa"
+      ],
+      [
+        "ui_faixa_atual"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "inj_zera",
+    "type": "inject",
+    "name": "Zerar medições",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 160,
+    "y": 1480,
+    "wires": [
+      [
+        "fn_zera"
+      ]
+    ],
+    "z": "tab_oic"
+  },
+  {
+    "id": "fn_zera",
+    "type": "function",
+    "name": "Zera medições",
+    "func": "flow.set(\"med_atuador\", []);\nflow.set(\"t_comando\", null);\nreturn { payload: \"sem medições\" };",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 440,
+    "y": 1480,
+    "wires": [
+      [
+        "ui_med"
+      ]
+    ],
+    "z": "tab_oic"
+  }
+]
