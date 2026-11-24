@@ -6,7 +6,7 @@ Autora: Dayane Nascimento de Toledo.
 O sistema lê o sinal de ECG, calcula a frequência cardíaca (BPM) no próprio ESP32, liga um buzzer quando o BPM fica fora de uma faixa segura por mais de 5 s e publica os dados por **MQTT** (TCP/IP) para um painel no **Node-RED**. O projeto roda no simulador **Wokwi**; o módulo AD8232 é substituído por um chip personalizado que gera o sinal de ECG.
 
 - **Simulação no Wokwi:** https://wokwi.com/projects/481504335028549633
-- **Vídeo-demonstração:** _(link será adicionado)_
+- **Vídeo-demonstração:** https://youtu.be/Lgfu4ZPzMmk
 
 > Projeto acadêmico. Não é um equipamento médico e não serve para diagnóstico.
 
